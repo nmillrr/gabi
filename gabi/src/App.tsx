@@ -5,27 +5,21 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const PressDocUI = () => {
   const [docType, setDocType] = useState('advisory');
   const [quickInput, setQuickInput] = useState('');
-  const [preview, setPreview] = useState('');
   
   // State for Media Advisory fields
   const [advisoryData, setAdvisoryData] = useState({
     headline: '',
-    mainText: '',
+    summary: '',
     eventDate: '',
     eventTime: '',
     location: '',
-    speakers: [],
     contactName: '',
-    contactTitle: '',
     contactPhone: '',
-    contactEmail: '',
-    contactAddress: '',
-    websiteLinks: ['']
+    contactEmail: ''
   });
 
   // State for Run of Show fields
@@ -33,28 +27,60 @@ const PressDocUI = () => {
     eventTitle: '',
     eventDate: '',
     eventLocation: '',
-    speakers: []
+    speakers: [{ name: '', title: '', organization: '', time: '', notes: '' }]
   });
 
   const handleQuickInput = () => {
-    // Here we'll add AI processing for the quick input
-    // For now, just show a preview
-    setPreview(quickInput);
+    // Add logic to parse the quick input text
+    // Populate the appropriate form fields
+    alert('Processing quick input: ' + quickInput);
   };
 
-  const addWebsiteLink = () => {
-    setAdvisoryData(prev => ({
-      ...prev,
-      websiteLinks: [...prev.websiteLinks, '']
-    }));
+  //Download PDF using app.py
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const formData = docType === 'advisory' ? advisoryData : showData;
+      
+      const response = await fetch('/generate-document', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: docType,
+          content: formData
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Document generation failed');
+      }
+      
+      // Create blob from the PDF stream
+      const blob = await response.blob();
+      
+      // Create download link and trigger it
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = docType === 'advisory' ? 'media_advisory.pdf' : 'run_of_show.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      
+    } catch (error) {
+      console.error('Error generating document:', error);
+      alert('Failed to generate document. Please try again.');
+    }
   };
 
-  const updateWebsiteLink = (index, value) => {
-    const newLinks = [...advisoryData.websiteLinks];
-    newLinks[index] = value;
-    setAdvisoryData(prev => ({
+  const addSpeaker = () => {
+    setShowData(prev => ({
       ...prev,
-      websiteLinks: newLinks
+      speakers: [...prev.speakers, { name: '', title: '', organization: '', time: '', notes: '' }]
     }));
   };
 
@@ -66,23 +92,15 @@ const PressDocUI = () => {
         </CardHeader>
         <CardContent>
           <div className="mb-6">
-            <Label>Quick Input / Notes</Label>
+            <Label>Quick Input</Label>
             <Textarea 
-              placeholder="Paste your notes here..."
+              placeholder="Paste your notes here for automatic parsing..."
               value={quickInput}
               onChange={(e) => setQuickInput(e.target.value)}
-              className="mb-2 h-32"
+              className="mb-2"
             />
-            <Button onClick={handleQuickInput}>Process Notes</Button>
+            <Button onClick={handleQuickInput}>Process Quick Input</Button>
           </div>
-
-          {preview && (
-            <Alert className="mb-4">
-              <AlertDescription>
-                <pre className="whitespace-pre-wrap">{preview}</pre>
-              </AlertDescription>
-            </Alert>
-          )}
 
           <Tabs defaultValue="advisory" onValueChange={setDocType}>
             <TabsList className="mb-4">
@@ -91,104 +109,190 @@ const PressDocUI = () => {
             </TabsList>
 
             <TabsContent value="advisory">
-              <form className="space-y-4">
-                <div>
-                  <Label>Website Links</Label>
-                  {advisoryData.websiteLinks.map((link, index) => (
-                    <div key={index} className="flex gap-2 mb-2">
-                      <Input
-                        value={link}
-                        onChange={(e) => updateWebsiteLink(index, e.target.value)}
-                        placeholder="Enter website URL"
-                      />
-                      {index === advisoryData.websiteLinks.length - 1 && (
-                        <Button type="button" onClick={addWebsiteLink}>+</Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <Label>Headline</Label>
                   <Input
                     value={advisoryData.headline}
                     onChange={(e) => setAdvisoryData(prev => ({...prev, headline: e.target.value}))}
-                    placeholder="ENTER HEADLINE IN ALL CAPS"
+                    placeholder="Enter headline"
                   />
                 </div>
-
                 <div>
-                  <Label>Main Text</Label>
+                  <Label>Summary</Label>
                   <Textarea
-                    value={advisoryData.mainText}
-                    onChange={(e) => setAdvisoryData(prev => ({...prev, mainText: e.target.value}))}
-                    placeholder="Enter the main body text..."
-                    className="h-32"
+                    value={advisoryData.summary}
+                    onChange={(e) => setAdvisoryData(prev => ({...prev, summary: e.target.value}))}
+                    placeholder="Enter event summary"
                   />
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Event Date</Label>
                     <Input
-                      type="text"
+                      type="date"
                       value={advisoryData.eventDate}
                       onChange={(e) => setAdvisoryData(prev => ({...prev, eventDate: e.target.value}))}
-                      placeholder="Friday, February 7, 2025"
                     />
                   </div>
                   <div>
                     <Label>Event Time</Label>
                     <Input
-                      type="text"
+                      type="time"
                       value={advisoryData.eventTime}
                       onChange={(e) => setAdvisoryData(prev => ({...prev, eventTime: e.target.value}))}
-                      placeholder="11:00 a.m."
                     />
                   </div>
                 </div>
-
                 <div>
                   <Label>Location</Label>
                   <Input
                     value={advisoryData.location}
                     onChange={(e) => setAdvisoryData(prev => ({...prev, location: e.target.value}))}
-                    placeholder="Full address"
+                    placeholder="Enter event location"
                   />
                 </div>
-
-                <div className="space-y-4">
-                  <Label>Contact Information</Label>
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>Contact Name</Label>
                     <Input
                       value={advisoryData.contactName}
                       onChange={(e) => setAdvisoryData(prev => ({...prev, contactName: e.target.value}))}
-                      placeholder="Contact Name"
-                    />
-                    <Input
-                      value={advisoryData.contactTitle}
-                      onChange={(e) => setAdvisoryData(prev => ({...prev, contactTitle: e.target.value}))}
-                      placeholder="Title"
+                      placeholder="Contact name"
                     />
                   </div>
-                  <Input
-                    value={advisoryData.contactAddress}
-                    onChange={(e) => setAdvisoryData(prev => ({...prev, contactAddress: e.target.value}))}
-                    placeholder="Address"
-                  />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Contact Phone</Label>
                     <Input
                       value={advisoryData.contactPhone}
                       onChange={(e) => setAdvisoryData(prev => ({...prev, contactPhone: e.target.value}))}
-                      placeholder="Phone"
+                      placeholder="Contact phone"
                     />
+                  </div>
+                  <div>
+                    <Label>Contact Email</Label>
                     <Input
                       value={advisoryData.contactEmail}
                       onChange={(e) => setAdvisoryData(prev => ({...prev, contactEmail: e.target.value}))}
-                      placeholder="Email"
+                      placeholder="Contact email"
                     />
                   </div>
                 </div>
-
                 <Button type="submit">Generate Media Advisory</Button>
               </form>
+            </TabsContent>
+
+            <TabsContent value="runofshow">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label>Event Title</Label>
+                  <Input
+                    value={showData.eventTitle}
+                    onChange={(e) => setShowData(prev => ({...prev, eventTitle: e.target.value}))}
+                    placeholder="Enter event title"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Event Date</Label>
+                    <Input
+                      type="date"
+                      value={showData.eventDate}
+                      onChange={(e) => setShowData(prev => ({...prev, eventDate: e.target.value}))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Event Location</Label>
+                    <Input
+                      value={showData.eventLocation}
+                      onChange={(e) => setShowData(prev => ({...prev, eventLocation: e.target.value}))}
+                      placeholder="Enter event location"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <Label>Speakers</Label>
+                  {showData.speakers.map((speaker, index) => (
+                    <div key={index} className="p-4 border rounded-lg space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label>Name</Label>
+                          <Input
+                            value={speaker.name}
+                            onChange={(e) => {
+                              const newSpeakers = [...showData.speakers];
+                              newSpeakers[index].name = e.target.value;
+                              setShowData(prev => ({...prev, speakers: newSpeakers}));
+                            }}
+                            placeholder="Speaker name"
+                          />
+                        </div>
+                        <div>
+                          <Label>Title</Label>
+                          <Input
+                            value={speaker.title}
+                            onChange={(e) => {
+                              const newSpeakers = [...showData.speakers];
+                              newSpeakers[index].title = e.target.value;
+                              setShowData(prev => ({...prev, speakers: newSpeakers}));
+                            }}
+                            placeholder="Speaker title"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label>Organization</Label>
+                          <Input
+                            value={speaker.organization}
+                            onChange={(e) => {
+                              const newSpeakers = [...showData.speakers];
+                              newSpeakers[index].organization = e.target.value;
+                              setShowData(prev => ({...prev, speakers: newSpeakers}));
+                            }}
+                            placeholder="Organization"
+                          />
+                        </div>
+                        <div>
+                          <Label>Speaking Time</Label>
+                          <Input
+                            type="time"
+                            value={speaker.time}
+                            onChange={(e) => {
+                              const newSpeakers = [...showData.speakers];
+                              newSpeakers[index].time = e.target.value;
+                              setShowData(prev => ({...prev, speakers: newSpeakers}));
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Notes</Label>
+                        <Textarea
+                          value={speaker.notes}
+                          onChange={(e) => {
+                            const newSpeakers = [...showData.speakers];
+                            newSpeakers[index].notes = e.target.value;
+                            setShowData(prev => ({...prev, speakers: newSpeakers}));
+                          }}
+                          placeholder="Additional notes"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" onClick={addSpeaker} className="w-full">
+                    Add Speaker
+                  </Button>
+                </div>
+                <Button type="submit">Generate Run of Show</Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default PressDocUI;
